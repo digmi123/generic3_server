@@ -83,3 +83,32 @@ def send_forgot_password_email(user_email: str, new_password: str) -> bool:
     except Exception as e:
         logger.error("Failed to send forgot-password email to %s: %s", user_email, e)
         return False
+
+
+def _build_2fa_html(code: str) -> str:
+    return f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Your Verification Code</h2>
+        <p>Use the code below to complete your login. It expires in 5 minutes.</p>
+        <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px; background: #f4f4f4;
+                  padding: 16px; border-radius: 4px; display: inline-block;">
+            {code}
+        </p>
+        <p>If you did not request this code, please ignore this email.</p>
+        <p>The Generic3 Team</p>
+    </div>
+    """
+
+
+def send_2fa_email(user_email: str, code: str) -> bool:
+    try:
+        resend.Emails.send({
+            "from": settings.DEFAULT_FROM_EMAIL,
+            "to": [user_email],
+            "subject": "Your Generic3 verification code",
+            "html": _build_2fa_html(code),
+        })
+        return True
+    except Exception as e:
+        logger.error("Failed to send 2FA email to %s: %s", user_email, e)
+        return False

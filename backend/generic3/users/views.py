@@ -121,7 +121,9 @@ def clinic_patients_list(request):
     with transaction.atomic():
         user = serializer.save()
 
-    send_welcome_email(serializer.instance.email, serializer.generated_password, 'Patient')
+    send_welcome_email(
+        serializer.instance.email, serializer.generated_password, "Patient"
+    )
 
     return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
@@ -202,7 +204,9 @@ def clinic_doctors_list(request):
     with transaction.atomic():
         user = serializer.save()
 
-    send_welcome_email(serializer.instance.email, serializer.generated_password, 'Doctor')
+    send_welcome_email(
+        serializer.instance.email, serializer.generated_password, "Doctor"
+    )
 
     return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
@@ -261,7 +265,9 @@ def research_patients_list(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def me(request):
-    return Response(UserSerializer(request.user).data)
+    user_data = UserSerializer(request.user).data
+    user_data["active_clinic_id"] = request.auth.get("clinic_id")  # from JWT payload
+    return Response(user_data)
 
 
 @api_view(["GET", "PUT", "PATCH", "DELETE"])

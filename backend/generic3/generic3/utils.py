@@ -1,8 +1,7 @@
 import random
 import string
 from django.core.cache import cache
-from django.core.mail import send_mail
-from django.conf import settings
+from services.email_service import send_2fa_email
 
 
 def _make_cache_key(user_id: str) -> str:
@@ -13,13 +12,7 @@ def send_2fa_code(user) -> str:
     """Generate a 6-digit code, store in cache for 5 min, email it to the user."""
     code = ''.join(random.choices(string.digits, k=6))
     cache.set(_make_cache_key(str(user.id)), code, timeout=300)
-    send_mail(
-        subject='Your verification code',
-        message=f'Your 2FA code is: {code}',
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        fail_silently=True,
-    )
+    send_2fa_email(user.email, code)
     return code
 
 

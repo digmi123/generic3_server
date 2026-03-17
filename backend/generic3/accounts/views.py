@@ -84,7 +84,7 @@ def sessions(request):
             return Response({'detail': '2FA code sent.', 'user_id': str(user.id), 'requires_2fa': True},
                             status=status.HTTP_200_OK)
 
-        if user.role == 'CLINIC_MANAGER':
+        if user.role in ('CLINIC_MANAGER', 'DOCTOR'):
             clinic_ids = list(user.staff.staff_clinics.values_list('clinic_id', flat=True))
             if len(clinic_ids) > 1:
                 return _clinic_selection_response(user)
@@ -116,13 +116,13 @@ def select_clinic(request):
         return Response({'detail': 'user_id and clinic_id are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        user = User.objects.get(id=user_id, role='CLINIC_MANAGER')
+        user = User.objects.get(id=user_id, role__in=('CLINIC_MANAGER', 'DOCTOR'))
     except User.DoesNotExist:
         return Response({'detail': 'Invalid user.'}, status=status.HTTP_400_BAD_REQUEST)
 
     owns_clinic = user.staff.staff_clinics.filter(clinic_id=clinic_id).exists()
     if not owns_clinic:
-        return Response({'detail': 'You do not manage this clinic.'}, status=status.HTTP_403_FORBIDDEN)
+        return Response({'detail': 'You do not belong to this clinic.'}, status=status.HTTP_403_FORBIDDEN)
 
     refresh = _issue_session(user, clinic_id)
     payload = _build_user_payload(user)
@@ -171,7 +171,7 @@ def verify_2fa(request):
     if not verify_2fa_code(user, code):
         return Response({'detail': 'Invalid or expired code.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if user.role == 'CLINIC_MANAGER':
+    if user.role in ('CLINIC_MANAGER', 'DOCTOR'):
         clinic_ids = list(user.staff.staff_clinics.values_list('clinic_id', flat=True))
         if len(clinic_ids) > 1:
             return _clinic_selection_response(user)
