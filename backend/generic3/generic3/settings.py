@@ -1,10 +1,10 @@
-from pathlib import Path
+import os
 from datetime import timedelta
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-import os
-from dotenv import load_dotenv
 load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = "django-insecure-kql^$yfj@39^0##n=36*yf0xq+gn_#apjcmh)(*s8xu0wkv^&g"
