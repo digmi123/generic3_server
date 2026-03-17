@@ -1,7 +1,11 @@
-from pathlib import Path
+import os
 from datetime import timedelta
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = "django-insecure-kql^$yfj@39^0##n=36*yf0xq+gn_#apjcmh)(*s8xu0wkv^&g"
 
@@ -64,9 +68,9 @@ WSGI_APPLICATION = "generic3.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "generic3_new_dev",
+        "NAME": "generic3_dev",
         "USER": "postgres",
-        "PASSWORD": "88788456a",
+        "PASSWORD": "a123456",
         "HOST": "localhost",
         "PORT": "5432",
     }
@@ -126,4 +130,5 @@ USE_TZ = True
 STATIC_URL = "static/"
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-DEFAULT_FROM_EMAIL = "noreply@generic3.com"
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@generic3.com")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY")

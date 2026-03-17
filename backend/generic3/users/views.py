@@ -13,6 +13,7 @@ from .serializers import (
     CreatePatientSerializer,
     CreateResearchPatientSerializer,
 )
+from services.email_service import send_welcome_email
 
 User = get_user_model()
 
@@ -120,7 +121,7 @@ def clinic_patients_list(request):
     with transaction.atomic():
         user = serializer.save()
 
-    # send_welcome_email(user.email, user.full_name, serializer.generated_password)
+    send_welcome_email(serializer.instance.email, serializer.generated_password, 'Patient')
 
     return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
@@ -201,7 +202,7 @@ def clinic_doctors_list(request):
     with transaction.atomic():
         user = serializer.save()
 
-    # send_welcome_email(user.email, user.full_name, serializer.generated_password)
+    send_welcome_email(serializer.instance.email, serializer.generated_password, 'Doctor')
 
     return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
