@@ -8,6 +8,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from django.conf import settings
 from generic3.utils import send_2fa_code, verify_2fa_code, setup_totp
 from users.serializers import UserSerializer
+from clinics.serializers import ClinicSerializer
 
 User = get_user_model()
 
@@ -41,6 +42,25 @@ def _build_user_payload(user):
     return {'user': UserSerializer(user).data}
 
 
+def _issue_session(user, clinic_id=None):
+    """Create a refresh token, optionally embedding active_clinic_id, and return it."""
+    refresh = RefreshToken.for_user(user)
+    if clinic_id:
+        refresh['active_clinic_id'] = str(clinic_id)
+        refresh.access_token['active_clinic_id'] = str(clinic_id)
+    return refresh
+
+
+def _clinic_selection_response(user):
+    """Return the requires_clinic_selection response with the manager's clinics."""
+    clinics = [sc.clinic for sc in user.staff.staff_clinics.select_related('clinic').all()]
+    return Response({
+        'requires_clinic_selection': True,
+        'user_id': str(user.id),
+        'clinics': ClinicSerializer(clinics, many=True).data,
+    }, status=status.HTTP_200_OK)
+
+
 @api_view(['POST', 'DELETE'])
 @permission_classes([AllowAny])
 def sessions(request):
@@ -64,7 +84,16 @@ def sessions(request):
             return Response({'detail': '2FA code sent.', 'user_id': str(user.id), 'requires_2fa': True},
                             status=status.HTTP_200_OK)
 
-        refresh = RefreshToken.for_user(user)
+        if user.role == 'CLINIC_MANAGER':
+            clinic_ids = list(user.staff.staff_clinics.values_list('clinic_id', flat=True))
+            if len(clinic_ids) > 1:
+                return _clinic_selection_response(user)
+            # single clinic — auto-select
+            clinic_id = clinic_ids[0] if clinic_ids else None
+            refresh = _issue_session(user, clinic_id)
+        else:
+            refresh = _issue_session(user)
+
         payload = _build_user_payload(user)
         response = Response(payload, status=status.HTTP_200_OK)
         _set_jwt_cookies(response, refresh)
@@ -73,6 +102,32 @@ def sessions(request):
     # DELETE — logout
     response = Response({'detail': 'Logged out.'}, status=status.HTTP_200_OK)
     _clear_jwt_cookies(response)
+    return response
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def select_clinic(request):
+    """Step 2 for clinic managers with multiple clinics — pick active clinic and receive JWT."""
+    user_id = request.data.get('user_id')
+    clinic_id = request.data.get('clinic_id')
+
+    if not user_id or not clinic_id:
+        return Response({'detail': 'user_id and clinic_id are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = User.objects.get(id=user_id, role='CLINIC_MANAGER')
+    except User.DoesNotExist:
+        return Response({'detail': 'Invalid user.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    owns_clinic = user.staff.staff_clinics.filter(clinic_id=clinic_id).exists()
+    if not owns_clinic:
+        return Response({'detail': 'You do not manage this clinic.'}, status=status.HTTP_403_FORBIDDEN)
+
+    refresh = _issue_session(user, clinic_id)
+    payload = _build_user_payload(user)
+    response = Response(payload, status=status.HTTP_200_OK)
+    _set_jwt_cookies(response, refresh)
     return response
 
 
@@ -116,7 +171,15 @@ def verify_2fa(request):
     if not verify_2fa_code(user, code):
         return Response({'detail': 'Invalid or expired code.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    refresh = RefreshToken.for_user(user)
+    if user.role == 'CLINIC_MANAGER':
+        clinic_ids = list(user.staff.staff_clinics.values_list('clinic_id', flat=True))
+        if len(clinic_ids) > 1:
+            return _clinic_selection_response(user)
+        clinic_id = clinic_ids[0] if clinic_ids else None
+        refresh = _issue_session(user, clinic_id)
+    else:
+        refresh = _issue_session(user)
+
     payload = _build_user_payload(user)
     response = Response(payload, status=status.HTTP_200_OK)
     _set_jwt_cookies(response, refresh)
