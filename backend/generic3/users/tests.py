@@ -101,3 +101,21 @@ class CreateDoctorSendsWelcomeEmailTest(TestCase):
         self.assertEqual(email_arg, "newdoctor@test.com")
         self.assertIsNotNone(password_arg)
         self.assertEqual(role_arg, "Doctor")
+
+    @patch("users.views.send_welcome_email")
+    def test_user_created_even_if_email_fails_for_doctor(self, mock_send_email):
+        mock_send_email.return_value = False  # email failure
+        manager = _make_clinic_manager("manager4@test.com")
+        clinic = _make_clinic()
+        _link_manager_to_clinic(manager, clinic)
+        client = _auth_client(manager, clinic.id)
+
+        response = client.post(
+            "/api/v1/users/doctors/",
+            {"email": "doctor2@test.com", "first_name": "Another", "last_name": "Doctor"},
+            format="json",
+        )
+
+        # HTTP 201 even though email returned False
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(User.objects.filter(email="doctor2@test.com").exists())
