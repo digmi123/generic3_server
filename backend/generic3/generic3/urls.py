@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
-from modules import views as module_views
+from modules.urls import clinic_urlpatterns as module_clinic_urlpatterns
+from medications.urls import clinic_urlpatterns as medication_clinic_urlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -8,14 +9,7 @@ urlpatterns = [
     path('api/v1/users/', include('users.urls')),
     path('api/v1/clinics/', include('clinics.urls')),
     path('api/v1/modules/', include('modules.urls')),
-    # Nested clinic modules
-    path('api/v1/clinics/<uuid:clinic_id>/modules/',
-         module_views.clinic_modules_list, name='clinic-modules-list'),
-    path('api/v1/clinics/<uuid:clinic_id>/modules/<uuid:module_id>/',
-         module_views.clinic_module_detail, name='clinic-module-detail'),
-    # Nested patient modules
-    path('api/v1/clinics/<uuid:clinic_id>/patients/<uuid:patient_id>/modules/',
-         module_views.patient_modules_list, name='patient-modules-list'),
-    path('api/v1/clinics/<uuid:clinic_id>/patients/<uuid:patient_id>/modules/<uuid:module_id>/',
-         module_views.patient_module_detail, name='patient-module-detail'),
+    path('api/v1/clinics/', include(module_clinic_urlpatterns)),
+    path('api/v1/medications/', include('medications.urls')),
+    path('api/v1/clinics/', include(medication_clinic_urlpatterns)),
 ]

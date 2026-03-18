@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from clinics.models import Clinic
 from modules.models import Module, ClinicModule
 from users.models import Staff, StaffClinic, Patient, PatientClinic, PatientDoctor
+from medications.models import Medication, ClinicMedication
 
 User = get_user_model()
 
@@ -48,6 +49,45 @@ class Command(BaseCommand):
         for clinic in [clinic1, clinic2]:
             for module in [mod_meds, mod_activities, mod_questionnaires]:
                 ClinicModule.objects.get_or_create(clinic=clinic, module=module)
+
+        # ── Medications ────────────────────────────────────────────────────────
+        medications_data = [
+            ("Amoxicillin",     "Capsule",   "mg"),
+            ("Ibuprofen",       "Tablet",    "mg"),
+            ("Paracetamol",     "Tablet",    "mg"),
+            ("Metformin",       "Tablet",    "mg"),
+            ("Atorvastatin",    "Tablet",    "mg"),
+            ("Lisinopril",      "Tablet",    "mg"),
+            ("Omeprazole",      "Capsule",   "mg"),
+            ("Salbutamol",      "Inhaler",   "mcg"),
+            ("Insulin Glargine","Injection", "units"),
+            ("Amoxicillin",     "Syrup",     "mg/5ml"),
+            ("Azithromycin",    "Tablet",    "mg"),
+            ("Ciprofloxacin",   "Tablet",    "mg"),
+            ("Dexamethasone",   "Injection", "mg"),
+            ("Furosemide",      "Tablet",    "mg"),
+            ("Amlodipine",      "Tablet",    "mg"),
+            ("Losartan",        "Tablet",    "mg"),
+            ("Sertraline",      "Tablet",    "mg"),
+            ("Diazepam",        "Tablet",    "mg"),
+            ("Morphine",        "Injection", "mg"),
+            ("Ondansetron",     "Tablet",    "mg"),
+        ]
+        meds = []
+        for med_name, med_form, med_unit in medications_data:
+            med, _ = Medication.objects.get_or_create(
+                med_name=med_name,
+                med_form=med_form,
+                defaults={"med_unit": med_unit},
+            )
+            meds.append(med)
+        self.stdout.write(self.style.SUCCESS(f"  Seeded {len(meds)} medications"))
+
+        # Assign all medications to both clinics
+        for clinic in [clinic1, clinic2]:
+            for med in meds:
+                ClinicMedication.objects.get_or_create(clinic=clinic, medication=med)
+        self.stdout.write(self.style.SUCCESS("  Linked medications to both clinics"))
 
         # ── Admin user ─────────────────────────────────────────────────────────
         if not User.objects.filter(email="admin@generic3.com").exists():

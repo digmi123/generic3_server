@@ -24,15 +24,3 @@ class ClinicModule(models.Model):
         return f'{self.clinic} — {self.module}'
 
 
-class PatientModule(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    patient = models.ForeignKey('users.Patient', on_delete=models.CASCADE, related_name='patient_modules')
-    clinic = models.ForeignKey('clinics.Clinic', on_delete=models.CASCADE, related_name='patient_modules')
-    module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='patient_modules')
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        unique_together = ('patient', 'clinic', 'module')
-
-    def __str__(self):
-        return f'{self.patient} — {self.module} @ {self.clinic}'

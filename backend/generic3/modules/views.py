@@ -3,10 +3,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import Module, ClinicModule, PatientModule
-from .serializers import ModuleSerializer, ClinicModuleSerializer, PatientModuleSerializer
+from .models import Module, ClinicModule
+from .serializers import ModuleSerializer, ClinicModuleSerializer
 from clinics.models import Clinic
-from users.models import Patient
 
 
 def _is_admin(user):
@@ -118,59 +117,3 @@ def clinic_module_detail(request, clinic_id, module_id):
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-# ── Patient modules ────────────────────────────────────────────────────────────
-
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def patient_modules_list(request, clinic_id, patient_id):
-    try:
-        clinic = Clinic.objects.get(id=clinic_id)
-        patient = Patient.objects.get(id=patient_id)
-    except (Clinic.DoesNotExist, Patient.DoesNotExist):
-        return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if request.method == 'GET':
-        qs = PatientModule.objects.filter(patient=patient, clinic=clinic).select_related('module')
-        return Response(PatientModuleSerializer(qs, many=True).data)
-
-    if not _is_staff(request.user):
-        return Response({'detail': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
-
-    module_id = request.data.get('module_id')
-    try:
-        module = Module.objects.get(id=module_id)
-    except Module.DoesNotExist:
-        return Response({'detail': 'Module not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-    # Ensure clinic has this module
-    if not ClinicModule.objects.filter(clinic=clinic, module=module).exists():
-        return Response({'detail': 'Module not enabled for this clinic.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    pm, created = PatientModule.objects.get_or_create(patient=patient, clinic=clinic, module=module)
-    return Response(PatientModuleSerializer(pm).data,
-                    status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
-
-
-@api_view(['GET', 'PATCH', 'DELETE'])
-@permission_classes([IsAuthenticated])
-def patient_module_detail(request, clinic_id, patient_id, module_id):
-    try:
-        pm = PatientModule.objects.get(patient_id=patient_id, clinic_id=clinic_id, module_id=module_id)
-    except PatientModule.DoesNotExist:
-        return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if request.method == 'GET':
-        return Response(PatientModuleSerializer(pm).data)
-
-    if not _is_staff(request.user):
-        return Response({'detail': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
-
-    if request.method == 'PATCH':
-        is_active = request.data.get('is_active')
-        if is_active is not None:
-            pm.is_active = is_active
-            pm.save()
-        return Response(PatientModuleSerializer(pm).data)
-
-    pm.delete()
-    return Response(status=status.HTTP_204_NO_CONTENT)

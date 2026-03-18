@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Module, ClinicModule, PatientModule
+from .models import Module, ClinicModule
 
 
 class ModuleSerializer(serializers.ModelSerializer):
@@ -16,12 +16,3 @@ class ClinicModuleSerializer(serializers.ModelSerializer):
         model = ClinicModule
         fields = ['id', 'clinic', 'module', 'module_name', 'module_description', 'is_active']
         read_only_fields = ['id', 'clinic']
-
-
-class PatientModuleSerializer(serializers.ModelSerializer):
-    module_name = serializers.CharField(source='module.module_name', read_only=True)
-
-    class Meta:
-        model = PatientModule
-        fields = ['id', 'patient', 'clinic', 'module', 'module_name', 'is_active']
-        read_only_fields = ['id', 'patient', 'clinic']
