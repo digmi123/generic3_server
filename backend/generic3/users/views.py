@@ -7,6 +7,7 @@ from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 
 from .models import Staff, StaffClinic, Patient, PatientClinic
+from modules.models import ClinicModule
 from .serializers import (
     UserSerializer,
     CreateDoctorSerializer,
@@ -131,7 +132,7 @@ def clinic_patients_list(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def patient_detail(request, user_id):
-    """Admin, Clinic Manager, or Doctor — view a patient's details if in the same clinic."""
+    """Admin, Clinic Manager, or Doctor — view a patient's full profile."""
     try:
         target = User.objects.get(id=user_id, role__in=("PATIENT", "RESEARCH_PATIENT"))
     except User.DoesNotExist:
@@ -141,19 +142,53 @@ def patient_detail(request, user_id):
 
     requester = request.user
 
-    if _is_admin(requester):
-        return Response(UserSerializer(target).data)
+    if not (_is_admin(requester) or requester.role in ("CLINIC_MANAGER", "DOCTOR")):
+        return Response({"detail": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
 
-    if requester.role in ("CLINIC_MANAGER", "DOCTOR"):
+    if not _is_admin(requester):
         shared_clinic = PatientClinic.objects.filter(
             patient__user=target,
             clinic__staff_clinics__staff__user=requester,
         ).exists()
         if not shared_clinic:
             return Response({"detail": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
-        return Response(UserSerializer(target).data)
 
-    return Response({"detail": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
+    # General details
+    data = {
+        "id": str(target.id),
+        "first_name": target.first_name,
+        "last_name": target.last_name,
+        "email": target.email,
+        "phone_number": target.phone_number,
+        "role": target.role,
+    }
+
+    # Clinics the patient belongs to
+    patient_clinics = PatientClinic.objects.filter(
+        patient__user=target
+    ).select_related("clinic")
+    data["clinics"] = [
+        {"id": str(pc.clinic.id), "clinic_name": pc.clinic.clinic_name}
+        for pc in patient_clinics
+    ]
+
+    # Modules from the requesting doctor's active clinic
+    active_clinic_id = request.auth.get("active_clinic_id") if request.auth else None
+    if active_clinic_id:
+        clinic_modules = ClinicModule.objects.filter(
+            clinic_id=active_clinic_id, is_active=True
+        ).select_related("module")
+        data["modules"] = [
+            {"id": str(cm.module.id), "module_name": cm.module.module_name}
+            for cm in clinic_modules
+        ]
+    else:
+        data["modules"] = []
+
+    # Placeholder for future measurements
+    data["active_measurements"] = []
+
+    return Response(data)
 
 
 @api_view(["GET", "POST"])
