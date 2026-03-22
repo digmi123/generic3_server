@@ -11,7 +11,7 @@ from .serializers import (
     MedicationLogSerializer,
 )
 from clinics.models import Clinic
-from users.models import Patient
+from users.models import Patient, Staff
 
 
 def _is_admin(user):
@@ -169,13 +169,15 @@ def patient_medications_list(request, clinic_id, user_id):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    doctor_id = request.data.get("doctor_id")
+    doctor_user_id = request.data.get("doctor_user_id")
+    doctor = Staff.objects.get(user_id=doctor_user_id)
+    print("Doctor:", doctor)
     serializer = PatientMedicationSerializer(
         data={
             **request.data,
             "patient": str(patient.id),
             "clinic": str(clinic.id),
-            "doctor": doctor_id,
+            "doctor": doctor.id,
             "medication": medication_id,
         }
     )
@@ -187,10 +189,11 @@ def patient_medications_list(request, clinic_id, user_id):
 
 @api_view(["GET", "PATCH", "DELETE"])
 @permission_classes([IsAuthenticated])
-def patient_medication_detail(request, clinic_id, patient_id, medication_record_id):
+def patient_medication_detail(request, clinic_id, user_id, medication_record_id):
     try:
+        patient = Patient.objects.get(user_id=user_id)
         pm = PatientMedication.objects.get(
-            id=medication_record_id, patient_id=patient_id, clinic_id=clinic_id
+            id=medication_record_id, patient_id=patient.id, clinic_id=clinic_id
         )
     except PatientMedication.DoesNotExist:
         return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -269,13 +272,20 @@ def medication_log_detail(request, clinic_id, patient_id, medication_record_id, 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def patient_all_medication_logs(request, clinic_id, patient_id):
-    qs = (
-        MedicationLog.objects.filter(
-            patient__id=patient_id,
-            patient_medication__clinic_id=clinic_id,
-        )
-        .select_related("patient_medication__medication")
-        .order_by("-taken_at")
-    )
+def patient_all_medication_logs(request, clinic_id, user_id):
+    patient = Patient.objects.get(user_id=user_id)
+    qs = MedicationLog.objects.filter(
+        patient=patient,
+        patient_medication__clinic_id=clinic_id,
+    ).select_related("patient_medication__medication")
+
+    med_name = request.query_params.get("med_name")
+    if med_name:
+        qs = qs.filter(patient_medication__medication__med_name__iexact=med_name)
+
+    start_date = request.query_params.get("start_date")
+    if start_date:
+        qs = qs.filter(taken_at__date__gte=start_date)
+
+    qs = qs.order_by("-taken_at")
     return Response(MedicationLogSerializer(qs, many=True).data)
